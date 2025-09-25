@@ -1,7 +1,11 @@
 import os
 import re
+import logging
 from typing import List, Iterator, Tuple, Dict
 from models import SearchParams
+
+# Get logger
+logger = logging.getLogger('FastMCP_FileSearch')
 
 # Load environment variables from .env file
 try:
@@ -41,6 +45,8 @@ def parse_search_prompt_with_llm(prompt: str) -> SearchParams:
     Use an LLM to parse the user prompt and extract search parameters.
     Replace this with actual LLM API calls (OpenAI, Claude, etc.)
     """
+    logger.debug(f"parse_search_prompt_with_llm() called with prompt: '{prompt}'")
+    
     # Standard prompt template for file search parsing
     system_prompt = """You are an expert file search parameter extraction assistant. Your task is to analyze user requests for file searches and extract structured parameters.
 
@@ -81,6 +87,7 @@ Request: "{prompt}"
 Return the JSON structure with extracted parameters."""
     
     try:
+        logger.info("🤖 Making LLM API call to parse search prompt")
         from openai import OpenAI
         client = OpenAI()
         
@@ -94,9 +101,11 @@ Return the JSON structure with extracted parameters."""
         )
         
         llm_response = response.choices[0].message.content
-        print(f"LLM Response: {llm_response}")  # Debug output
+        logger.info(f"✅ LLM API call successful. Response length: {len(llm_response) if llm_response else 0} characters")
+        logger.debug(f"LLM raw response: {llm_response}")
         
         if not llm_response or llm_response.strip() == "":
+            logger.error("Empty response from OpenAI API")
             raise ValueError("Empty response from OpenAI API")
 
         # Clean the response - remove any markdown code blocks or extra text
@@ -108,26 +117,35 @@ Return the JSON structure with extracted parameters."""
         if llm_response.endswith("```"):
             llm_response = llm_response[:-3]
         llm_response = llm_response.strip()
+        logger.debug(f"Cleaned LLM response: {llm_response}")
 
         import json
         parsed = json.loads(llm_response)
+        logger.info(f"✅ Successfully parsed LLM response into SearchParams")
+        logger.debug(f"Parsed parameters: {parsed}")
         return SearchParams(**parsed)
         
     except json.JSONDecodeError as e:
-        print(f"JSON parsing failed: {e}")
-        print(f"Raw LLM response: '{llm_response}'")
+        logger.error(f"❌ JSON parsing failed: {e}")
+        logger.error(f"Raw LLM response: '{llm_response}'")
+        logger.info("🔄 Falling back to rule-based parsing")
         return fallback_parse_prompt(prompt)
     except Exception as e:
-        print(f"LLM parsing failed: {e}, falling back to rule-based parsing")
+        logger.error(f"❌ LLM parsing failed: {e}")
+        logger.info("🔄 Falling back to rule-based parsing")
         return fallback_parse_prompt(prompt)
 
 def fallback_parse_prompt(prompt: str) -> SearchParams:
     """Fallback rule-based parsing if LLM fails"""
+    logger.info("🔧 Using fallback rule-based parsing")
+    logger.debug(f"Fallback parsing prompt: '{prompt}'")
+    
     prompt_lower = prompt.lower()
     
     # Extract file types
     file_types = re.findall(r'\.(\w+)', prompt_lower)
     file_types = [f'.{ext}' for ext in file_types]
+    logger.debug(f"Extracted file types: {file_types}")
     
     # Remove file type mentions and extract keywords
     keyword_text = re.sub(r'\.(\w+)', '', prompt_lower)
@@ -158,4 +176,22 @@ def validate_folder_path(folder_path: str) -> List[Dict[str, str]]:
     
     return []
 
+if __name__ == "__main__":
+    # Test the LLM parsing
+    test_prompt = "find pdf files and txt documents about machine learning and AI"
+    print("Testing LLM parsing...")
+    print(f"Input: {test_prompt}")
+    
+    # Check if OpenAI API key is set
+    api_key = os.getenv('OPENAI_API_KEY')
+    print(f"API Key present: {'Yes' if api_key else 'No'}")
+    if api_key:
+        print(f"API Key starts with: {api_key[:10]}...")
+    
+    result = parse_search_prompt(test_prompt)
+    print(f"Result: {result}")
 
+    # Example usage
+    prompt = "Find pdf files and txt documents with name containing 'lucy' and about machine learning and AI"
+    params = parse_search_prompt(prompt)
+    print(params)

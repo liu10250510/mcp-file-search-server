@@ -48,5 +48,6 @@ Thumbs.db
 
 # Project specific
 *.log
+logs/
 test_*.py
 debug_*.py
