@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "file-search": {
+      "command": "/Users/lucy/projects/MCP/.venv/bin/python",
+      "args": ["/Users/lucy/projects/MCP/fastmcp_server.py"],
+      "env": {
+        "PYTHONPATH": "/Users/lucy/projects/MCP"
+      }
+    }
+  }
+}
